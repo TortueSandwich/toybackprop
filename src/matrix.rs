@@ -6,7 +6,7 @@ use rand::{thread_rng, Rng};
 
 #[derive(Debug, Clone)]
 pub struct Matrix<const ROW: usize, const COL: usize> {
-    data: [[f64; COL]; ROW],
+    pub data: [[f64; COL]; ROW],
 }
 
 impl<const ROW: usize, const COL: usize> Matrix<ROW, COL> {
@@ -93,6 +93,33 @@ impl<const ROW: usize, const COL: usize> std::ops::Add<f64> for Matrix<ROW, COL>
     type Output = Self;
     fn add(self, rhs: f64) -> Self::Output {
         self.mapv(|x| x + rhs)
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::Sub<f64> for Matrix<ROW, COL> {
+    type Output = Self;
+    fn sub(self, rhs: f64) -> Self::Output {
+        self.mapv(|x| x - rhs)
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::Sub<Matrix<ROW, COL>> for Matrix<ROW, COL> {
+    type Output = Self;
+    fn sub(self, rhs: Matrix<ROW, COL>) -> Self::Output {
+        self.mapvindex(|(i,j),x| x - rhs.data[i][j])
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::Mul<f64> for Matrix<ROW, COL> {
+    type Output = Self;
+    fn mul(self, rhs: f64) -> Self::Output {
+        self.mapv(|x| x * rhs)
+    }
+}
+
+impl<const N:usize> Matrix<N,1> {
+    pub fn sum(&self) -> f64 {
+        self.data.iter().fold(0.0, |acc, x|acc+x[0])
     }
 }
 

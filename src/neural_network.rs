@@ -1,20 +1,38 @@
-use crate::{matrix::Matrix, veclayer::LayerLink};
+use crate::{loss::LossFunction, matrix::Matrix, veclayer::LayerLink};
 
-
-pub struct NeuralNetwork<const INPUTS: usize, const OUTPUTS: usize, H: LayerLink<INPUTS, OUTPUTS>> {
+pub struct NeuralNetwork<const INPUTS: usize, const OUTPUTS: usize, H: LayerLink<INPUTS, OUTPUTS>, L: LossFunction<OUTPUTS>> {
     pub network: H,
+    pub loss_function: L,
 }
 
-impl<const INPUTS: usize, const OUTPUTS: usize, H: LayerLink<INPUTS,OUTPUTS>> NeuralNetwork<INPUTS,OUTPUTS, H> {
-    pub fn new(n: H) -> Self {
+impl<const INPUTS: usize, const OUTPUTS: usize, H: LayerLink<INPUTS,OUTPUTS>, L: LossFunction<OUTPUTS>> NeuralNetwork<INPUTS,OUTPUTS, H, L> {
+    pub fn new(network: H, loss_function: L) -> Self {
         NeuralNetwork {
-            network: n
+            network,
+            loss_function,
         }
     }
 
     pub fn forward(&self, input: Matrix<INPUTS, 1>) -> Matrix<OUTPUTS, 1> {
         self.network.forward(input) 
     }
+
+    pub fn train(&mut self, input: Matrix<INPUTS, 1>, target: Matrix<OUTPUTS, 1>) {
+        // Passer l'entrée à travers le réseau
+        let predicted = self.network.forward(input.clone());
+
+        // Calculer la perte
+        let loss = self.loss_function.compute(&predicted, &target);
+
+        // Calculer le gradient de la perte
+        let output_gradient = self.loss_function.gradient(&predicted, &target);
+
+        // Rétropropagation
+        self.network.backward(input, output_gradient);
+        
+        // println!("Loss: {}", loss);
+    }
+    
 }
 
 
