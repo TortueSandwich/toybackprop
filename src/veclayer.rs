@@ -4,11 +4,15 @@ use crate::{layer::Layer, matrix::Matrix};
 
 pub trait LayerLink<const INPUTS: usize, const LAST_OUTPUTS: usize> {
     fn forward(&self, input: Matrix<INPUTS, 1>) -> Matrix<LAST_OUTPUTS, 1>;
-    fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<LAST_OUTPUTS, 1>) -> Matrix<INPUTS, 1>;
+    // fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<LAST_OUTPUTS, 1>) -> Matrix<INPUTS, 1>;
+    fn printeq(&self, i :u32);
+
+    fn backward(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<LAST_OUTPUTS, 1>>); 
 }
 
 /// La derniere couche de neurone
 /// OUTPUTS = LAST_OUTPUTS
+#[derive(Clone)]
 pub struct OutputLayer<const INPUTS: usize, const OUTPUTS: usize> {
     pub layer: Layer<INPUTS, OUTPUTS>,
 }
@@ -20,8 +24,16 @@ impl<const INPUTS: usize, const OUTPUTS: usize> LayerLink<INPUTS, OUTPUTS>
         self.layer.forward(input)
     }
     
-    fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<OUTPUTS, 1>) -> Matrix<INPUTS, 1> {
-        self.layer.backward(input, output_gradient, 0.05) // Learning rate todo
+    // fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<OUTPUTS, 1>) -> Matrix<INPUTS, 1> {
+    //     self.layer.backward(input, output_gradient, 1.0) // Learning rate todo
+    // }
+
+    fn printeq(&self, i: u32) {
+        println!("layer {i}");
+        self.layer.printequation();
+    }
+    fn backward(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<OUTPUTS, 1>>) {
+        self.layer.backward(X, Y);
     }
 }
 
@@ -47,14 +59,20 @@ impl<
         self.next.forward(tmp)
     }
 
-    fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<LAST_OUTPUTS, 1>) -> Matrix<INPUTS, 1> {
-        let next_input = self.layer.forward(input.clone());
-        
-        // Rétropropagation pour la couche suivante
-        let next_output_gradient = self.next.backward(next_input, output_gradient);
-        
-        // Appliquer la rétropropagation pour la couche actuelle
-        self.layer.backward(input, next_output_gradient, 0.01) // Learning rate
+    // fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<LAST_OUTPUTS, 1>) -> Matrix<INPUTS, 1> {
+    //     let next_input = self.layer.forward(input.clone());
+    //     let next_output_gradient = self.next.backward(next_input, output_gradient);
+    //     self.layer.backward(input, next_output_gradient, 1.0) // Learning rate
+    // }
+
+    fn printeq(&self,i:u32) {
+        println!("layer {i}");
+        self.layer.printequation();
+        self.next.printeq(i+1);
+    }
+
+    fn backward(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<LAST_OUTPUTS, 1>>) {
+        todo!()
     }
 }
 

@@ -1,5 +1,6 @@
 use crate::{loss::LossFunction, matrix::Matrix, veclayer::LayerLink};
 
+#[derive(Clone)]
 pub struct NeuralNetwork<const INPUTS: usize, const OUTPUTS: usize, H: LayerLink<INPUTS, OUTPUTS>, L: LossFunction<OUTPUTS>> {
     pub network: H,
     pub loss_function: L,
@@ -13,26 +14,34 @@ impl<const INPUTS: usize, const OUTPUTS: usize, H: LayerLink<INPUTS,OUTPUTS>, L:
         }
     }
 
-    pub fn forward(&self, input: Matrix<INPUTS, 1>) -> Matrix<OUTPUTS, 1> {
+    // forward pass
+    pub fn  predict(&self, input: Matrix<INPUTS, 1>) -> Matrix<OUTPUTS, 1> {
         self.network.forward(input) 
     }
 
-    pub fn train(&mut self, input: Matrix<INPUTS, 1>, target: Matrix<OUTPUTS, 1>) {
-        // Passer l'entrée à travers le réseau
+    pub fn get_gradiant(&mut self, input: Matrix<INPUTS, 1>, target: Matrix<OUTPUTS, 1>) {
         let predicted = self.network.forward(input.clone());
+        self.loss_function.gradient(&predicted, &target);
 
-        // Calculer la perte
-        let loss = self.loss_function.compute(&predicted, &target);
+    }
 
-        // Calculer le gradient de la perte
-        let output_gradient = self.loss_function.gradient(&predicted, &target);
+    pub fn ducoupppp(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<OUTPUTS, 1>>) {
+        self.network.backward(X, Y);
+    }
 
-        // Rétropropagation
-        self.network.backward(input, output_gradient);
+    pub fn fit(&mut self, input: Matrix<INPUTS, 1>, target: Matrix<OUTPUTS, 1>) {
+        let predicted = self.network.forward(input.clone());
+        // let loss = self.loss_function.compute(&predicted, &target);
         
-        // println!("Loss: {}", loss);
+        let output_gradient = self.loss_function.gradient(&predicted, &target);
+        // println!("predicted : {}   ===   {}",predicted.data[0][0], target.data[0][0]);
+        // println!("outputgrad: gard {output_gradient}");
+        self.network.backward(input, output_gradient);
     }
     
+    pub fn printequations(&self) {
+        self.network.printeq(0);
+    }
 }
 
 
