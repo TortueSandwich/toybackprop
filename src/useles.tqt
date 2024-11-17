@@ -1,0 +1,5 @@
+Ok surtout mon probleme c'est pour implementer la version full batch/minibatch.
+pour l'instant je le fais de maniere stocastique, Pour une couche L ,je caculele gradiant des ses poids et les modifi qu'une seule fois comme ça je ne renvois quie le gradiant de la couche precedente.
+
+J'ai deux idées.
+Soit il faut renvoyer le gradiant des poids aussi, peut etre sous forme de liste

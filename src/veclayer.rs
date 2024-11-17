@@ -1,14 +1,33 @@
-#![allow(unused)]
+#![allow(unused, non_snake_case)]
 
-use crate::{layer::Layer, matrix::Matrix};
+use std::collections::LinkedList;
+
+use crate::{
+    layer::Layer,
+    loss::{LossFunction, MeanSquaredError},
+    matrix::Matrix, matrixchain::{HCons, HLeaf, HList, Nil, Push},
+};
 
 pub trait LayerLink<const INPUTS: usize, const LAST_OUTPUTS: usize> {
     fn forward(&self, input: Matrix<INPUTS, 1>) -> Matrix<LAST_OUTPUTS, 1>;
-    // fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<LAST_OUTPUTS, 1>) -> Matrix<INPUTS, 1>;
-    fn printeq(&self, i :u32);
+    // fn backward(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<LAST_OUTPUTS, 1>>)
+    fn backward(
+        &mut self,
+        aLprev: Matrix<INPUTS, 1>,
+        loss: MeanSquaredError<LAST_OUTPUTS>,
+        y: Matrix<LAST_OUTPUTS, 1>,
+    ) -> 
+    // (HCons<INPUTS, LAST_OUTPUTS, LAST_OUTPUTS, impl HList<LAST_OUTPUTS>>, 
+        Matrix<INPUTS, 1>;
+    // ); // (aL, wl, bl)
 
-    fn backward(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<LAST_OUTPUTS, 1>>); 
+    fn apply_train(&mut self);
+
+    fn printeq(&self, i: u32);
+    fn len(&self) -> usize;
 }
+
+// LayerChain -> LayerChain<.. N> -> LayerChain<N, ..> -> ... -> OutputLayer
 
 /// La derniere couche de neurone
 /// OUTPUTS = LAST_OUTPUTS
@@ -23,17 +42,33 @@ impl<const INPUTS: usize, const OUTPUTS: usize> LayerLink<INPUTS, OUTPUTS>
     fn forward(&self, input: Matrix<INPUTS, 1>) -> Matrix<OUTPUTS, 1> {
         self.layer.forward(input)
     }
-    
-    // fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<OUTPUTS, 1>) -> Matrix<INPUTS, 1> {
-    //     self.layer.backward(input, output_gradient, 1.0) // Learning rate todo
-    // }
+
+    // toute dernière couche
+    fn backward(
+        &mut self,
+        aLprev: Matrix<INPUTS, 1>,
+        loss: MeanSquaredError<OUTPUTS>,
+        y: Matrix<OUTPUTS, 1>,
+    ) -> // (HCons<INPUTS, OUTPUTS, OUTPUTS, impl HList<OUTPUTS>>, 
+        Matrix<INPUTS, 1>
+    // ) 
+    {
+        let aL = self.layer.forwardonce(aLprev.clone());
+        let dCaL = loss.gradient(&aL, &y);
+        return self.layer.backwardonce(aLprev, dCaL);
+    }
+
+    fn apply_train(&mut self) {
+        self.layer.apply_the_train();
+    }
 
     fn printeq(&self, i: u32) {
         println!("layer {i}");
         self.layer.printequation();
     }
-    fn backward(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<OUTPUTS, 1>>) {
-        self.layer.backward(X, Y);
+
+    fn len(&self) -> usize {
+        0
     }
 }
 
@@ -59,79 +94,38 @@ impl<
         self.next.forward(tmp)
     }
 
-    // fn backward(&mut self, input: Matrix<INPUTS, 1>, output_gradient: Matrix<LAST_OUTPUTS, 1>) -> Matrix<INPUTS, 1> {
-    //     let next_input = self.layer.forward(input.clone());
-    //     let next_output_gradient = self.next.backward(next_input, output_gradient);
-    //     self.layer.backward(input, next_output_gradient, 1.0) // Learning rate
-    // }
+    // couche strictement interne
+    fn backward(
+        &mut self,
+        aLprev: Matrix<INPUTS, 1>,
+        loss: MeanSquaredError<LAST_OUTPUTS>,
+        y: Matrix<LAST_OUTPUTS, 1>,
+    ) -> 
+    // (HCons<INPUTS, OUTPUTS, LAST_OUTPUTS, impl HList<LAST_OUTPUTS>>, 
+        Matrix<INPUTS, 1>
+    // ) 
+    {
+        // println!("yo");
+        // Propagation avant pour la couche courante
+        let aL = self.layer.forwardonce(aLprev.clone());
 
-    fn printeq(&self,i:u32) {
+        // Récupération du gradient depuis la couche suivante
+        let (dCaL) = self.next.backward(aL, loss, y);
+        return self.layer.backwardonce(aLprev, dCaL);
+    }
+
+    fn apply_train(&mut self) {
+        self.layer.apply_the_train();
+        self.next.apply_train();
+    }
+
+    fn printeq(&self, i: u32) {
         println!("layer {i}");
         self.layer.printequation();
-        self.next.printeq(i+1);
+        self.next.printeq(i + 1);
     }
 
-    fn backward(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<LAST_OUTPUTS, 1>>) {
-        todo!()
+    fn len(&self) -> usize {
+        1 + self.next.len()
     }
-}
-
-#[macro_export]
-macro_rules! create_network {
-    // Cas de base : dernière couche avec OutputLayer
-    ($first:expr, $second:expr) => {
-        $crate::veclayer::OutputLayer::<$first, $second> {
-            layer: $crate::layer::Layer::<$first, $second>::rand(),
-        }
-    };
-
-    // Cas récursif : capture les deux premiers éléments et continue avec le reste
-    ($first:expr, $second:expr, $($rest:expr),+) => {{
-        $crate::veclayer::LayerChain::<$first, $second, { create_network!(@last $($rest),+) }, _> {
-            layer: $crate::layer::Layer::<$first, $second>::rand(),
-            next: create_network!($second, $($rest),+),
-        }
-    }};
-
-    // Capture le dernier argument de la liste
-    (@last $last:expr) => {
-        $last
-    };
-
-    // Cas récursif avec plusieurs arguments pour capturer la dernière valeur
-    (@last $first:expr, $($rest:expr),+) => {
-        create_network!(@last $($rest),+)
-    };
-}
-
-
-//todo
-#[macro_export]
-macro_rules! network_type {
-    // Cas pour un réseau avec uniquement une couche de sortie
-    ($inputs:expr, $outputs:expr) => {
-        NeuralNetwork<$inputs, $outputs, veclayer::OutputLayer<$inputs, $outputs>, MeanSquaredError<$outputs>>
-    };
-
-    // Cas récursif pour plusieurs couches cachées
-    ($inputs:expr, $($layers:expr),+) => {{
-        // Récupérer le dernier type de couche
-        let last_layer = network_type!(@last $($layers),+);
-        
-        // Construire la chaîne de couches en partant de la couche de sortie
-        let layer_chain = network_type!($inputs, $($layers),*); // Étoile pour inclure toutes les couches
-        
-        // Construire le réseau avec la chaîne de couches
-        NeuralNetwork::<$inputs, {last_layer}, {layer_chain}, MeanSquaredError<$inputs>>
-    }};
-
-    // Capture le dernier argument de la liste
-    (@last $last:expr) => {
-        $last
-    };
-
-    // Cas récursif avec plusieurs arguments pour capturer la dernière valeur
-    (@last $first:expr, $($rest:expr),+) => {
-        network_type!(@last $($rest),+)
-    };
 }

@@ -4,12 +4,13 @@ use std::ops::Div;
 
 use rand::{thread_rng, Rng};
 
-pub trait ActivationFunction {
+pub trait ActivationFunction : Clone {
     fn activate(&self, x: f64) -> f64;
     fn derivative(&self, x: f64) -> f64; // For backpropagation
 }
 
 /// Rectified Linear Units
+#[derive(Clone)]
 struct ReLU;
 impl ActivationFunction for ReLU {
     fn activate(&self, x: f64) -> f64 {
@@ -31,6 +32,7 @@ impl ActivationFunction for ReLU {
 /// Gaussian Error Linear Units
 /// GELU(x) = xP(X<=x) = (x/2) * (1+erf(x/sqrt(2)))
 /// Where X ~ N(0,1)
+#[derive(Clone)]
 struct GELU;
 impl ActivationFunction for GELU {
     fn activate(&self, x: f64) -> f64 {
@@ -41,6 +43,7 @@ impl ActivationFunction for GELU {
     }
 }
 
+#[derive(Clone)]
 pub struct Sigmoid;
 impl ActivationFunction for Sigmoid {
     fn activate(&self, x: f64) -> f64 {
@@ -51,6 +54,7 @@ impl ActivationFunction for Sigmoid {
     }
 }
 
+#[derive(Clone)]
 struct Tanh;
 impl ActivationFunction for Tanh {
     fn activate(&self, x: f64) -> f64 {
@@ -62,6 +66,7 @@ impl ActivationFunction for Tanh {
 }
 
 /// Leaky ReLU
+#[derive(Clone)]
 struct LeakyReLU;
 impl ActivationFunction for LeakyReLU {
     fn activate(&self, x: f64) -> f64 {
@@ -80,9 +85,11 @@ impl ActivationFunction for LeakyReLU {
     }
 }
 
+#[derive(Clone)]
 struct GLU;
 // todo!();
 
+#[derive(Clone)]
 struct Swish {
     beta: f64, // can be LEARNABLE PARAMETER
 }
@@ -96,6 +103,7 @@ impl ActivationFunction for Swish {
     }
 }
 
+#[derive(Clone)]
 struct SoftPlus;
 impl ActivationFunction for SoftPlus {
     fn activate(&self, x: f64) -> f64 {
@@ -108,6 +116,7 @@ impl ActivationFunction for SoftPlus {
 }
 
 /// Exponential Linear Unit
+#[derive(Clone)]
 struct ELU {
     alpha: f64, // > 0 todo
 }
@@ -129,6 +138,7 @@ impl ActivationFunction for ELU {
 }
 
 /// Scaled Exponential Linear Unit
+#[derive(Clone)]
 struct SELU {
     alpha: f64, // > 0 todo
     lambda: f64,
@@ -155,6 +165,7 @@ impl ActivationFunction for SELU {
     }
 }
 
+#[derive(Clone)]
 struct SiLU;
 impl ActivationFunction for SiLU {
     fn activate(&self, x: f64) -> f64 {
@@ -165,6 +176,7 @@ impl ActivationFunction for SiLU {
     }
 }
 
+#[derive(Clone)]
 struct Mish;
 impl ActivationFunction for Mish {
     fn activate(&self, x: f64) -> f64 {
@@ -179,6 +191,7 @@ impl ActivationFunction for Mish {
 }
 
 /// Parametric Rectified Linear Unit,
+#[derive(Clone)]
 struct PReLU {
     parameter: f64, // 0< parameter <1
 }
@@ -199,6 +212,7 @@ impl ActivationFunction for PReLU {
     }
 }
 
+#[derive(Clone)]
 struct ReLU6;
 impl ActivationFunction for ReLU6 {
     fn activate(&self, x: f64) -> f64 {
@@ -218,6 +232,7 @@ impl ActivationFunction for ReLU6 {
     }
 }
 
+#[derive(Clone)]
 struct HardSwish;
 impl ActivationFunction for HardSwish {
     fn activate(&self, x: f64) -> f64 {
@@ -228,12 +243,14 @@ impl ActivationFunction for HardSwish {
     }
 }
 
+#[derive(Clone)]
 struct Maxout;
 // todo
 
 /// Adaptive Richard's Curve Weighted Activation
 /// wtf
 ///  Swish is a special case of ARiA, manifested at ARiA=f(x, 1, 0, 1, 1, β, 1)
+#[derive(Clone)]
 struct ARiA {
     a: f64, // lower asymptote
     k: f64, // upper asymptote   (a<k) ? todo
@@ -256,6 +273,7 @@ impl ActivationFunction for ARiA {
 
 /// Adaptive Richard's Curve Weighted Activation 2 (simplified)
 /// wtf
+#[derive(Clone)]
 struct ARiA2 {
     alpha: f64, //contraint? todo
     beta: f64,
@@ -275,6 +293,7 @@ impl ActivationFunction for ARiA2 {
     }
 }
 
+#[derive(Clone)]
 struct ShiftedSoftplus;
 impl ActivationFunction for ShiftedSoftplus {
     fn activate(&self, x: f64) -> f64 {
@@ -285,6 +304,7 @@ impl ActivationFunction for ShiftedSoftplus {
     }
 }
 
+#[derive(Clone)]
 struct Softsign;
 impl ActivationFunction for Softsign {
     fn activate(&self, x: f64) -> f64 {
@@ -296,6 +316,7 @@ impl ActivationFunction for Softsign {
     }
 }
 
+#[derive(Clone)]
 struct TanhExp;
 impl ActivationFunction for TanhExp {
     fn activate(&self, x: f64) -> f64 {
@@ -306,6 +327,7 @@ impl ActivationFunction for TanhExp {
     }
 }
 
+#[derive(Clone)]
 struct ModReLU {
     bias: f64,
 }
@@ -323,6 +345,7 @@ impl ActivationFunction for ModReLU {
     }
 }
 
+#[derive(Clone)]
 struct HardSigmoid;
 impl ActivationFunction for HardSigmoid {
     fn activate(&self, x: f64) -> f64 {
@@ -344,6 +367,7 @@ impl ActivationFunction for HardSigmoid {
 }
 
 /// Randomized Leaky Rectified Linear Units
+#[derive(Clone)]
 struct RReLU {
     l: f64,
     u: f64, // l<u && l,u \in [0,1) todo
@@ -374,6 +398,7 @@ impl ActivationFunction for RReLU {
     }
 }
 
+#[derive(Clone)]
 struct Serf;
 impl ActivationFunction for Serf {
     fn activate(&self, x: f64) -> f64 {
@@ -385,6 +410,7 @@ impl ActivationFunction for Serf {
     }
 }
 
+#[derive(Clone)]
 struct DELU {
     n: f64, // reel ? LEARNABLE PARAMETER
 }
@@ -402,6 +428,7 @@ impl ActivationFunction for DELU {
 }
 
 /// S-shaped Rectified Linear Unit
+#[derive(Clone)]
 struct SReLU {
     // LEARNABLE PARAMETER
     tl: f64,
@@ -422,74 +449,92 @@ impl ActivationFunction for SReLU {
 }
 
 /// Parameterized Exponential Linear Units
+#[derive(Clone)]
 struct PELU ;
 // todo
 
 /// Adaptive Parametric activation 
+#[derive(Clone)]
 struct APA;
 // todo
 
 /// Margin Rectified Linear Unit
+#[derive(Clone)]
 struct MarginReLU;
 //todo
 
 /// Cosine Linear Unit
+#[derive(Clone)]
 struct CosLU;
 //todo
 
 /// Scaled Exponentially-Regularized Linear Unit
+#[derive(Clone)]
 struct SERLU;
 //todo
 
 /// Shifted Rectified Linear Unit
+#[derive(Clone)]
 struct ShiLU;
 //todo
 
 /// Collapsing Linear Unit
+#[derive(Clone)]
 struct CoLU;
 // todo
 
 /// Continuously Differentiable Exponential Linear Units
+#[derive(Clone)]
 struct CELU;
 //todo
 
 
 /// Rectified Linear Unit N
+#[derive(Clone)]
 struct ReLUN {
     n:f64, //trainable parameter
 }
 //todo
 
 // Gumbel Cross Entropy
+#[derive(Clone)]
 struct GCE;
 //todo
 
 /// ScaledSoftSign
+#[derive(Clone)]
 struct ScaledSoftSign;
 //todo
 
+#[derive(Clone)]
 struct Smish;
 //todo
 
 /// Exponential Linear Squashing Activation
+#[derive(Clone)]
 struct ELiSH;
 //todo
 
+#[derive(Clone)]
 struct HardELiSH;
 // todo
 
 
 /// Optimizer Activation Function
+#[derive(Clone)]
 struct NIPUNA;
 //todo
 
+#[derive(Clone)]
 struct StarReLU;
 //todo
 
 
 /// Lecun's Tanh
+#[derive(Clone)]
 struct LecunTanh;
 //todo
 
+#[derive(Clone)]
 struct Hardtanh ;
 // todo
