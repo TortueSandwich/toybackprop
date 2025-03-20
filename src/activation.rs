@@ -4,14 +4,41 @@ use std::ops::Div;
 
 use rand::{thread_rng, Rng};
 
-pub trait ActivationFunction : Clone {
+pub trait ActivationFunction : Clone + Sized {
     fn activate(&self, x: f64) -> f64;
     fn derivative(&self, x: f64) -> f64; // For backpropagation
 }
 
+#[derive(Clone)]
+pub enum FonctionActivation {
+    LU,
+    ReLU,
+    Sigmoid,
+    LeakyReLU,
+}
+
+impl FonctionActivation {
+    pub fn activate(&self,x : f64) -> f64{
+        match self {
+            Self::LU => x,
+            Self::ReLU => (x+x.abs())/2.0,
+            Self::Sigmoid => 1.0.div(1.0 + (-x).exp()),
+            Self::LeakyReLU => if x >= 0.0 { x } else {0.1 * x},
+        }
+    }
+    pub fn derivative(&self, x:f64) -> f64 {
+        match self {
+            Self::LU => 1.0,
+            Self::ReLU => if x > 0.0 { 1.0 } else { 0.0 },
+            Self::Sigmoid => self.activate(x) * (1.0 - self.activate(x)),
+            Self::LeakyReLU => if x >= 0.0 { 1.0 } else { 0.1 }
+        }
+    }
+}
+
 /// Rectified Linear Units
 #[derive(Clone)]
-struct ReLU;
+pub struct ReLU;
 impl ActivationFunction for ReLU {
     fn activate(&self, x: f64) -> f64 {
         if x >= 0.0 {
@@ -33,7 +60,7 @@ impl ActivationFunction for ReLU {
 /// GELU(x) = xP(X<=x) = (x/2) * (1+erf(x/sqrt(2)))
 /// Where X ~ N(0,1)
 #[derive(Clone)]
-struct GELU;
+pub struct GELU;
 impl ActivationFunction for GELU {
     fn activate(&self, x: f64) -> f64 {
         todo!("choose approx")
@@ -67,7 +94,7 @@ impl ActivationFunction for Tanh {
 
 /// Leaky ReLU
 #[derive(Clone)]
-struct LeakyReLU;
+pub struct LeakyReLU;
 impl ActivationFunction for LeakyReLU {
     fn activate(&self, x: f64) -> f64 {
         if x >= 0.0 {
@@ -382,18 +409,18 @@ impl ActivationFunction for RReLU {
         if x > 0.0 {
             x
         } else {
-            todo!("le hasard n'est fait qu'one fois");
             //thread_rng().gen_range(self.l..self.u) * x
-            thread_rng().gen_range((1.0 / self.l)..(1.0 / self.u)) * x
+            // thread_rng().gen_range((1.0 / self.l)..(1.0 / self.u)) * x
+            todo!("le hasard n'est fait qu'one fois");
         }
     }
     fn derivative(&self, x: f64) -> f64 {
         if x > 0.0 {
             1.0
         } else {
-            todo!("le hasard n'est fait qu'one fois");
             //thread_rng().gen_range(self.l..self.u) * x
-            thread_rng().gen_range((1.0 / self.l)..(1.0 / self.u))
+            // thread_rng().gen_range((1.0 / self.l)..(1.0 / self.u))
+            todo!("le hasard n'est fait qu'one fois");
         }
     }
 }

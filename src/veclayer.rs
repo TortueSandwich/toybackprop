@@ -3,28 +3,30 @@
 use std::collections::LinkedList;
 
 use crate::{
-    layer::Layer,
-    loss::{LossFunction, MeanSquaredError},
-    matrix::Matrix, matrixchain::{HCons, HLeaf, HList, Nil, Push},
+    activation::ActivationFunction, layer::DenseLayer, loss::FonctionLoss, matrix::Matrix, matrixchain::{HCons, HLeaf, HList, Nil, Push}
 };
 
 pub trait LayerLink<const INPUTS: usize, const LAST_OUTPUTS: usize> {
     fn forward(&self, input: Matrix<INPUTS, 1>) -> Matrix<LAST_OUTPUTS, 1>;
-    // fn backward(&mut self, X: &Vec<Matrix<1, INPUTS>> ,  Y: &Vec<Matrix<LAST_OUTPUTS, 1>>)
+    fn backward_batch<const BATCH_SIZE: usize>(
+        &mut self,
+        previous_activation: [Matrix<INPUTS, 1>; BATCH_SIZE], // aL
+        loss_function: FonctionLoss<LAST_OUTPUTS>, // loss 
+        y: [Matrix<LAST_OUTPUTS, 1>; BATCH_SIZE],  // target_output
+    ) -> [Matrix<INPUTS, 1>;BATCH_SIZE];
+
     fn backward(
         &mut self,
-        aLprev: Matrix<INPUTS, 1>,
-        loss: MeanSquaredError<LAST_OUTPUTS>,
-        y: Matrix<LAST_OUTPUTS, 1>,
-    ) -> 
-    // (HCons<INPUTS, LAST_OUTPUTS, LAST_OUTPUTS, impl HList<LAST_OUTPUTS>>, 
-        Matrix<INPUTS, 1>;
-    // ); // (aL, wl, bl)
+        previous_activation: Matrix<INPUTS, 1>, // aL
+        loss_function: FonctionLoss<LAST_OUTPUTS>, // loss 
+        y: Matrix<LAST_OUTPUTS, 1>,  // target_output
+    ) -> Matrix<INPUTS, 1>;
 
-    fn apply_train(&mut self);
+    fn apply_train(&mut self, learning_rate : f64);
 
     fn printeq(&self, i: u32);
     fn len(&self) -> usize;
+    fn initialiser_avec_poids_he(&mut self);
 }
 
 // LayerChain -> LayerChain<.. N> -> LayerChain<N, ..> -> ... -> OutputLayer
@@ -33,33 +35,49 @@ pub trait LayerLink<const INPUTS: usize, const LAST_OUTPUTS: usize> {
 /// OUTPUTS = LAST_OUTPUTS
 #[derive(Clone)]
 pub struct OutputLayer<const INPUTS: usize, const OUTPUTS: usize> {
-    pub layer: Layer<INPUTS, OUTPUTS>,
+    pub layer: DenseLayer<INPUTS, OUTPUTS>,
 }
 
+// toute dernière couche
 impl<const INPUTS: usize, const OUTPUTS: usize> LayerLink<INPUTS, OUTPUTS>
     for OutputLayer<INPUTS, OUTPUTS>
 {
     fn forward(&self, input: Matrix<INPUTS, 1>) -> Matrix<OUTPUTS, 1> {
-        self.layer.forward(input)
+        self.layer.forward_pass(input)
     }
 
-    // toute dernière couche
+    fn backward_batch<const BATCH_SIZE: usize>(
+        &mut self,
+        previous_activation: [Matrix<INPUTS, 1>; BATCH_SIZE], // aL
+        loss_function: FonctionLoss<OUTPUTS>, // loss 
+        y: [Matrix<OUTPUTS, 1>; BATCH_SIZE],  // target_output
+    ) -> [Matrix<INPUTS, 1>;BATCH_SIZE] {
+        let activations = previous_activation.clone().map( |x|self.layer.forward_pass(x.clone()));
+        // let mut accloss = 0.0;
+        let mut accgrad = std::array::from_fn(|_| Matrix::zeros());
+        for i in 0..BATCH_SIZE {
+            // accloss += loss_function.compute(&activations[i], &y[i]);
+            accgrad[i] = loss_function.compute_grad(&activations[i], &y[i]);
+        }
+        
+        return self.layer.backpropagate_batch(previous_activation, accgrad);
+    }
+
     fn backward(
         &mut self,
-        aLprev: Matrix<INPUTS, 1>,
-        loss: MeanSquaredError<OUTPUTS>,
-        y: Matrix<OUTPUTS, 1>,
-    ) -> // (HCons<INPUTS, OUTPUTS, OUTPUTS, impl HList<OUTPUTS>>, 
-        Matrix<INPUTS, 1>
-    // ) 
-    {
-        let aL = self.layer.forwardonce(aLprev.clone());
-        let dCaL = loss.gradient(&aL, &y);
-        return self.layer.backwardonce(aLprev, dCaL);
-    }
+        previous_activation: Matrix<INPUTS, 1>, // aL
+        loss_function: FonctionLoss<OUTPUTS>, // loss 
+        y: Matrix<OUTPUTS, 1>,  // target_output
+    ) -> Matrix<INPUTS, 1> {
+        let activation = self.layer.forward_pass(previous_activation.clone());
+        let gradient_wrt_output =  loss_function.compute_grad(&activation, &y);
+        return self.layer.backpropagate(previous_activation, gradient_wrt_output);
 
-    fn apply_train(&mut self) {
-        self.layer.apply_the_train();
+    }
+    
+
+    fn apply_train(&mut self, learning_rate : f64) {
+        self.layer.apply_gradients(learning_rate);
     }
 
     fn printeq(&self, i: u32) {
@@ -70,6 +88,10 @@ impl<const INPUTS: usize, const OUTPUTS: usize> LayerLink<INPUTS, OUTPUTS>
     fn len(&self) -> usize {
         0
     }
+
+    fn initialiser_avec_poids_he(&mut self) {
+        self.layer.initialiser_poids_he(INPUTS);
+    }
 }
 
 pub struct LayerChain<
@@ -78,7 +100,7 @@ pub struct LayerChain<
     const LAST_OUTPUTS: usize,
     Next: LayerLink<OUTPUTS, LAST_OUTPUTS>,
 > {
-    pub layer: Layer<INPUTS, OUTPUTS>,
+    pub layer: DenseLayer<INPUTS, OUTPUTS>,
     pub next: Next,
 }
 
@@ -90,33 +112,42 @@ impl<
     > LayerLink<INPUTS, LAST_OUTPUTS> for LayerChain<INPUTS, OUTPUTS, LAST_OUTPUTS, Next>
 {
     fn forward(&self, input: Matrix<INPUTS, 1>) -> Matrix<LAST_OUTPUTS, 1> {
-        let tmp = self.layer.forward(input);
-        self.next.forward(tmp)
+        let prev_layer_output = self.layer.forward_pass(input);
+        self.next.forward(prev_layer_output)
     }
 
     // couche strictement interne
     fn backward(
         &mut self,
-        aLprev: Matrix<INPUTS, 1>,
-        loss: MeanSquaredError<LAST_OUTPUTS>,
+        aLprev: Matrix<INPUTS, 1>, // aL
+        loss: FonctionLoss<LAST_OUTPUTS>,
         y: Matrix<LAST_OUTPUTS, 1>,
-    ) -> 
-    // (HCons<INPUTS, OUTPUTS, LAST_OUTPUTS, impl HList<LAST_OUTPUTS>>, 
-        Matrix<INPUTS, 1>
-    // ) 
-    {
-        // println!("yo");
+    ) -> Matrix<INPUTS, 1> {
         // Propagation avant pour la couche courante
-        let aL = self.layer.forwardonce(aLprev.clone());
+        let aL = self.layer.forward_pass(aLprev.clone());
 
         // Récupération du gradient depuis la couche suivante
         let (dCaL) = self.next.backward(aL, loss, y);
-        return self.layer.backwardonce(aLprev, dCaL);
+        return self.layer.backpropagate(aLprev, dCaL);
     }
 
-    fn apply_train(&mut self) {
-        self.layer.apply_the_train();
-        self.next.apply_train();
+    fn backward_batch<const BATCH_SIZE: usize>(
+            &mut self,
+            previous_activation: [Matrix<INPUTS, 1>; BATCH_SIZE], // aL
+            loss_function: FonctionLoss<LAST_OUTPUTS>, // loss 
+            y: [Matrix<LAST_OUTPUTS, 1>; BATCH_SIZE],  // target_output
+        ) -> [Matrix<INPUTS, 1>;BATCH_SIZE] {
+        // Propagation avant pour la couche courante
+        let aL = previous_activation.clone().map(|x| self.layer.forward_pass(x));
+
+        // Récupération du gradient depuis la couche suivante
+        let (dCaL) = self.next.backward_batch(aL, loss_function, y);
+        return self.layer.backpropagate_batch(previous_activation, dCaL);
+    }
+
+    fn apply_train(&mut self, learning_rate : f64) {
+        self.layer.apply_gradients(learning_rate);
+        self.next.apply_train(learning_rate);
     }
 
     fn printeq(&self, i: u32) {
@@ -127,5 +158,10 @@ impl<
 
     fn len(&self) -> usize {
         1 + self.next.len()
+    }
+
+    fn initialiser_avec_poids_he(&mut self) {
+        self.layer.initialiser_poids_he(INPUTS);
+        self.next.initialiser_avec_poids_he();
     }
 }

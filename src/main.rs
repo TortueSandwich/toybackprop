@@ -1,10 +1,10 @@
 #![allow(unused_imports)]
 
-use loss::{LossFunction, MeanSquaredError};
 use matrix::Matrix;
 use neural_network::NeuralNetwork;
-use tool::plot_loss_to_png;
-use std::any::type_name_of_val;
+use rand::{rngs::{OsRng, StdRng}, SeedableRng};
+use tool::{plot_loss_data, plot_loss_to_png, save_loss_data};
+use std::{any::type_name_of_val, sync::Mutex, time::{SystemTime, UNIX_EPOCH}};
 use veclayer::{LayerChain, LayerLink};
 
 
@@ -17,32 +17,46 @@ mod veclayer;
 mod tool;
 mod matrixchain;
 mod layerbuffer;
+mod dataset;
 
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref GLOBAL_RNG: Mutex<StdRng> = Mutex::new(
+        StdRng::seed_from_u64(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs())
+        // OsRng
+        // StdRng::seed_from_u64(42)
+    );
+}
+
+
+#[allow(unused)]
 fn main() {
     const INPUT_DIM: usize = 2;
     const OUTPUT_DIM: usize = 1;
     
     let network = create_network!(INPUT_DIM, 1, OUTPUT_DIM);
 
-    let mut nn = NeuralNetwork::new(network, MeanSquaredError);
+    let mut nn = NeuralNetwork::new(network, loss::FonctionLoss::MSE);
+    nn.init_he();
 
     // XOR inputs et cibles
     // let input = Matrix::from([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]);
     // let target = Matrix::from([[0.0], [1.0], [1.0], [0.0]]);
 
     // OR
-    let input = vec![
+    let input = [
         Matrix::from([[0.0, 0.0]]),
         Matrix::from([[0.0, 1.0]]),
         Matrix::from([[1.0, 0.0]]),
         Matrix::from([[1.0, 1.0]]),
     ];
-    let target = vec![
+    let target = [
         Matrix::from([[0.0]]), 
         Matrix::from([[1.0]]),
         Matrix::from([[1.0]]),
-        Matrix::from([[1.0]])
-        ];
+        Matrix::from([[0.0]])
+    ];
     // let input = Matrix::from([
         // [0.0, 0.0],
         // [1.0, 0.0],
@@ -51,35 +65,48 @@ fn main() {
     // ]);
     // let target = Matrix::from([[0.0], [1.0], [1.0], [1.0]]);
 
-    // linéaire
-    // let input = vec![
+    // linéaire 2x+1
+    // let input = [
     //     Matrix::from([[0.0]]),
     //     Matrix::from([[1.0]]),
     //     Matrix::from([[2.0]]),
     //     Matrix::from([[3.0]]),
-    // ];
-    // let target =  vec![
-    //     Matrix::from([[0.0]]),
-    //     Matrix::from([[2.0]]),
     //     Matrix::from([[4.0]]),
-    //     Matrix::from([[6.0]]),
+    //     // Matrix::from([[5.0]]),
+    // ];
+    // let target =  [
+    //     Matrix::from([[0.0+1.0]]),
+    //     Matrix::from([[2.0+1.0]]),
+    //     Matrix::from([[4.0+1.0]]),
+    //     Matrix::from([[6.0+1.0]]),
+    //     Matrix::from([[8.0+1.0]]),
+    //     // Matrix::from([[10.0+10.0]]),
     //     ];
 
-    nn.printequations();
 
 
-    
-    // nn.get_gradiant(input, target);
 
-    
-
-    let epochs = 50;
-    let mut loss = [0.0,0.0,0.0,0.0];
     let mut losses = Vec::new();
+    println!("-------- Initial ---------");
+    nn.printequations();
+    let mut epoch_loss = 0.0;
+    for (i, t) in input.clone().into_iter().zip(target.clone().into_iter()) {
+        let predicted = nn.predict(i.transpose());
+        epoch_loss += nn.loss_function.compute(&predicted,&t);
+    }
+    println!("loss {}", epoch_loss/input.len() as f64);
+    losses.push(epoch_loss/input.len() as f64);
+    println!("-------------------------\n");
 
-    for epoch in 0..epochs {
-        println!("{epoch}");
-        nn.entraine(&input.clone(),&target.clone());
+
+    
+
+    const EPOCHS: usize = 20;
+    const LEARNING_RATE : f64 = 0.02;
+
+    for epoch in 0..EPOCHS {        
+        nn.entraine_full_batch(&input.clone(),&target.clone(), LEARNING_RATE);
+
         let mut epoch_loss = 0.0;
 
         // dataset 
@@ -89,17 +116,22 @@ fn main() {
         }
         
         nn.printequations();
-        println!("loss {}\n", epoch_loss/input.len() as f64)
+        epoch_loss /= input.len() as f64;
+        println!("loss {epoch_loss}\n", );
+        // save_loss_data(w, b, epoch_loss, "loss_data.csv");
+        losses.push(epoch_loss);
     }
 
-    nn.printequations();
-    println!("finito");
+    // plot_loss_data("loss_data.csv");
 
-    println!("\nRésultats après l'entraînement :");
+    println!("-------- finito ---------");
+    nn.printequations();
+
+    println!("\nRésultats après l'entraînement ({EPOCHS} epochs) :");
     for i in 0..input.len() {
         let input_example = input[i].clone();
         let predicted = nn.predict(input_example.transpose().clone());
-        match predicted.data[0].len()  {
+        match input_example.data[0].len()  {
             1 =>println!(
                 "Input: ({}), Predicted: {:.4}, Target: {}",
                 input_example.data[0][0],
@@ -117,7 +149,7 @@ fn main() {
         }
         ;
     }
-    plot_loss_to_png("./loss_plot.png", &losses).expect("failed to generate pdf");
+    plot_loss_to_png("./loss_plot.png", &losses, EPOCHS).expect("failed to generate pdf");
     println!("finito");
 }
 

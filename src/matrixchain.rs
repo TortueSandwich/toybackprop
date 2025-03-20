@@ -1,3 +1,5 @@
+#![allow(dead_code, unused, non_upper_case_globals)]
+
 use crate::matrix::Matrix;
 
 pub trait HList {}

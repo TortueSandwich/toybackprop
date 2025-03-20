@@ -4,6 +4,8 @@ use std::ops::Range;
 
 use rand::{thread_rng, Rng};
 
+use crate::GLOBAL_RNG;
+
 #[derive(Debug, Clone)]
 pub struct Matrix<const ROW: usize, const COL: usize> {
     pub data: [[f64; COL]; ROW],
@@ -30,7 +32,7 @@ impl<const ROW: usize, const COL: usize> Matrix<ROW, COL> {
         let mut result = Matrix::<ROW, COL>::new([[0.0; COL]; ROW]);
         for i in 0..ROW {
             for j in 0..COL {
-                result.data[i][j] = thread_rng().gen_range(range.clone());
+                result.data[i][j] = GLOBAL_RNG.lock().unwrap().gen_range(range.clone());
             }
         }
         result
@@ -44,6 +46,14 @@ impl<const ROW: usize, const COL: usize> Matrix<ROW, COL> {
             }
         }
         result
+    }
+
+    pub fn mapvinplace(&mut self, f: impl Fn(f64) -> f64) {
+        for i in 0..ROW {
+            for j in 0..COL {
+                self.data[i][j] = f(self.data[i][j]);
+            }
+        }
     }
 
     /// |(i,j),x| ...
@@ -96,6 +106,51 @@ impl<const ROW: usize, const COL: usize> std::ops::Add<f64> for Matrix<ROW, COL>
     }
 }
 
+impl<const ROW: usize, const COL: usize> std::ops::Add<Matrix<ROW, COL>> for f64 {
+    type Output = Matrix<ROW, COL>;
+    fn add(self, rhs: Matrix<ROW, COL>) -> Self::Output {
+        rhs + self
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::AddAssign<Matrix<ROW, COL>> for Matrix<ROW, COL> {
+    fn add_assign(&mut self, rhs: Matrix<ROW, COL>) {
+        *self = self.clone() + rhs;
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::SubAssign<Matrix<ROW, COL>> for Matrix<ROW, COL> {
+    fn sub_assign(&mut self, rhs: Matrix<ROW, COL>) {
+        *self = self.clone() - rhs;
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::Neg for Matrix<ROW, COL> {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        self.mapv(|x| -x)
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::Div<f64> for Matrix<ROW, COL> {
+    type Output = Self;
+    fn div(self, rhs: f64) -> Self::Output {
+        self.mapv(|x| x / rhs)
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::DivAssign<f64> for Matrix<ROW, COL> {
+    fn div_assign(&mut self, rhs: f64) {
+        *self = self.clone() / rhs;
+    }
+}
+
+impl<const ROW: usize, const COL: usize> std::ops::MulAssign<f64> for Matrix<ROW, COL> {
+    fn mul_assign(&mut self, rhs: f64) {
+        *self = self.clone() * rhs;
+    }
+}
+
 impl<const ROW: usize, const COL: usize> std::ops::Sub<f64> for Matrix<ROW, COL> {
     type Output = Self;
     fn sub(self, rhs: f64) -> Self::Output {
@@ -110,10 +165,18 @@ impl<const ROW: usize, const COL: usize> std::ops::Sub<Matrix<ROW, COL>> for Mat
     }
 }
 
+
+impl<const ROW: usize, const COL: usize> std::ops::Mul<Matrix<ROW, COL>> for f64 {
+    type Output = Matrix<ROW, COL>;
+    fn mul(self, rhs: Matrix<ROW, COL>) -> Self::Output {
+        rhs.mapv(|x| x * self)
+    }
+}
+
 impl<const ROW: usize, const COL: usize> std::ops::Mul<f64> for Matrix<ROW, COL> {
     type Output = Self;
     fn mul(self, rhs: f64) -> Self::Output {
-        self.mapv(|x| x * rhs)
+        rhs * self
     }
 }
 
